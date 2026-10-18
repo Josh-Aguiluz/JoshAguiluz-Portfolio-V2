@@ -1,0 +1,5 @@
+Repository Information
+======================
+GitHub Web URL: https://github.com/Josh-Aguiluz/JoshAguiluz-Portfolio
+Git Clone URL:  https://github.com/Josh-Aguiluz/JoshAguiluz-Portfolio.git
+Default Branch: master
