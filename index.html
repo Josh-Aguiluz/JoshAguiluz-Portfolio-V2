@@ -1,12 +1,62 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Josh Andrei Aguiluz | Backend Engineer</title>
   <meta name="description"
     content="Portfolio of Josh Andrei Aguiluz, a Top 1% Information Technology student specializing in Backend-focused Full-Stack Engineering." />
-  <title>Josh Andrei Aguiluz | Backend-focused Full-Stack Engineer</title>
+
+  <meta name="color-scheme" content="dark light" />
+  <meta name="theme-color" content="#09090b" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
+
+  <!-- Theme before first paint: saved choice, else the OS preference, else dark. -->
+  <script>
+    (function () {
+      var theme;
+      try { theme = localStorage.getItem('theme'); } catch (e) {}
+      if (theme !== 'light' && theme !== 'dark') {
+        theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+      }
+      var root = document.documentElement;
+      root.classList.toggle('dark', theme === 'dark');
+      var color = theme === 'dark' ? '#09090b' : '#fafafa';
+      var metas = document.querySelectorAll('meta[name="theme-color"]');
+      for (var i = 0; i < metas.length; i++) metas[i].setAttribute('content', color);
+
+      // The app restores the scroll position itself (src/App.tsx), before its first paint.
+      try { history.scrollRestoration = 'manual'; } catch (e) {}
+    })();
+  </script>
+
+  <link rel="icon" href="/favicon.png" type="image/png" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Josh Andrei Aguiluz" />
+  <meta property="og:title" content="Josh Andrei Aguiluz | Backend Engineer" />
+  <meta property="og:description"
+    content="Portfolio of Josh Andrei Aguiluz, a Top 1% Information Technology student specializing in Backend-focused Full-Stack Engineering." />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Josh Andrei Aguiluz | Backend Engineer" />
+  <meta name="twitter:description"
+    content="Portfolio of Josh Andrei Aguiluz, a Top 1% Information Technology student specializing in Backend-focused Full-Stack Engineering." />
+
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Person",
+      "name": "Josh Andrei Aguiluz",
+      "jobTitle": "Backend-focused Full-Stack Engineer",
+      "alumniOf": { "@type": "CollegeOrUniversity", "name": "Holy Angel University" },
+      "sameAs": [
+        "https://github.com/Josh-Aguiluz",
+        "https://www.linkedin.com/in/josh-aguiluz-0a150a350/"
+      ]
+    }
+  </script>
 </head>
 
 <body>

@@ -1,51 +1,37 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { Moon, Sun } from 'lucide-react';
 
-export default function ThemeToggle() {
-  const [isDark, setIsDark] = useState(false);
+const THEME_COLORS = { dark: '#09090b', light: '#fafafa' } as const;
 
-  useEffect(() => {
-    // Check for saved theme preference or default to light mode
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme === 'dark') {
-      setIsDark(true);
-      document.documentElement.classList.add('dark');
-    }
-  }, []);
+/** The initial theme is applied by the inline script in index.html before first paint. */
+export default function ThemeToggle({ className = '' }: { className?: string }) {
+  // Pre-rendered HTML assumes dark; sync to the real theme after hydration.
+  const [isDark, setIsDark] = useState(true);
+  useEffect(() => setIsDark(document.documentElement.classList.contains('dark')), []);
 
   const toggleTheme = () => {
-    setIsDark(!isDark);
-    if (!isDark) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
+    const next = !isDark;
+    setIsDark(next);
+    const theme = next ? 'dark' : 'light';
+    document.documentElement.classList.toggle('dark', next);
+    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute('content', THEME_COLORS[theme]));
+    try {
+      localStorage.setItem('theme', theme);
+    } catch {
+      /* storage unavailable (private mode): the choice lasts for this page view */
     }
   };
 
   return (
     <button
+      type="button"
       onClick={toggleTheme}
-      className="pill-button flex items-center hover:scale-110 transition-transform shadow-2xl"
-      style={{
-        position: 'fixed',
-        zIndex: 9999,
-        bottom: '1rem',
-        right: '1rem',
-        padding: '0.75rem 1rem',
-        backgroundColor: isDark ? '#7A8A9D' : '#5A6B7A',
-        color: isDark ? '#1A1F2E' : '#FFFCF9',
-        gap: '8px',
-        border: 'none',
-        borderRadius: '9999px',
-        cursor: 'pointer'
-      }}
-      aria-label="Toggle theme"
+      aria-label="Dark mode"
+      aria-pressed={isDark}
+      title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      className={`icon-btn ${className}`}
     >
-      <div className="w-5 h-5 sm:w-8 sm:h-8 rounded-full flex-shrink-0" style={{ backgroundColor: isDark ? '#4A5568' : '#E8C547' }}></div>
-      <span className="font-black uppercase text-xs sm:text-[18px]">
-        {isDark ? 'Light Mode' : 'Dark Mode'}
-      </span>
+      {isDark ? <Sun className="h-[18px] w-[18px]" aria-hidden="true" /> : <Moon className="h-[18px] w-[18px]" aria-hidden="true" />}
     </button>
   );
 }
