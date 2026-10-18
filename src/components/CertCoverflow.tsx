@@ -43,6 +43,17 @@ export default function CertCoverflow({ certifications }: CertCoverflowProps) {
     };
   }, [selectedCert]);
 
+  // Arrow-key navigation (only when no modal is open)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (selectedCert) return;
+      if (e.key === 'ArrowLeft') goPrev();
+      if (e.key === 'ArrowRight') goNext();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [selectedCert, goPrev, goNext]);
+
   const getCardStyle = (index: number) => {
     if (index === activeIndex) {
       return {
@@ -82,7 +93,7 @@ export default function CertCoverflow({ certifications }: CertCoverflowProps) {
 
   return (
     <>
-      <div className="glass-deck-container" style={{ minHeight: '650px' }}>
+      <div className="glass-deck-container cert-deck">
         <div className="glass-deck-fan">
           {certifications.map((cert, index) => {
             const style = getCardStyle(index);
@@ -92,7 +103,7 @@ export default function CertCoverflow({ certifications }: CertCoverflowProps) {
             return (
               <motion.div
                 key={index}
-                className={`glass-card ${isActive ? 'glass-card-active' : ''}`}
+                className={`glass-card cert-card ${isActive ? 'glass-card-active cert-card-active' : 'cert-card-side'}`}
                 animate={{
                   x: style.x,
                   scale: style.scale,
@@ -143,22 +154,23 @@ export default function CertCoverflow({ certifications }: CertCoverflowProps) {
 
                 {/* Card Image */}
                 <div
-                  className={`glass-card-image certification-image-container ${isActive ? 'group cursor-pointer' : ''}`}
+                  className={`glass-card-image certification-image-container cert-image ${isActive ? 'group cursor-pointer' : ''}`}
                   onClick={(e) => {
                     if (isActive) {
                       e.stopPropagation();
                       setSelectedCert(cert);
                     }
                   }}
-                  title={isActive ? "Preview Credential" : ""}
+                  title={isActive ? 'Preview Credential' : ''}
                 >
+                  <span className="cert-counter" aria-hidden="true">
+                    {String(index + 1).padStart(2, '0')} / {String(n).padStart(2, '0')}
+                  </span>
                   <img src={cert.image} alt={cert.alt || `Professional Certification: ${cert.title} issued by ${cert.issuer}`} draggable={false} />
-                  <div className="glass-card-image-overlay transition-all duration-300 group-hover:bg-black/40" />
 
-                  {/* Hover Preview Overlay */}
                   {isActive && (
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <div className="flex items-center gap-2 bg-[#A47A2D]/90 backdrop-blur-sm text-white px-5 py-2.5 rounded-full shadow-xl transform scale-95 group-hover:scale-100 transition-transform duration-300 border border-white/20">
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/35 transition-opacity duration-300">
+                      <div className="flex items-center gap-2 bg-[#A47A2D]/95 text-white px-5 py-2.5 rounded-full shadow-xl border border-white/20">
                         <Eye className="w-4 h-4" />
                         <span className="text-[11px] font-black uppercase tracking-widest" style={{ fontFamily: 'Michroma, sans-serif' }}>Preview</span>
                       </div>
@@ -167,57 +179,61 @@ export default function CertCoverflow({ certifications }: CertCoverflowProps) {
                 </div>
 
                 {/* Card Content */}
-                <div className="glass-card-content">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-[10px] font-black text-[#8A5A19] dark:text-[#D4AF37] uppercase tracking-widest" style={{ fontFamily: 'Michroma, sans-serif' }}>
-                      {cert.issuer}
+                <div className="glass-card-content cert-content">
+                  <div className="flex items-center gap-2">
+                    <span className="cert-issuer">{cert.issuer}</span>
+                    <span className="cert-verified">
+                      <CheckCircle2 className="w-3 h-3" />
+                      Verified
                     </span>
-                    <div className="flex items-center gap-1.5 px-2 py-0.5 bg-[#BF953F]/10 rounded-full border border-[#BF953F]/30">
-                      <CheckCircle2 className="w-3 h-3 text-[#BF953F]" />
-                      <span className="text-[8px] font-bold text-[#A47A2D] uppercase tracking-wider">Verified</span>
-                    </div>
                   </div>
 
-                  <div className="glass-card-title">{cert.title}</div>
+                  <div className="glass-card-title cert-title">{cert.title}</div>
 
                   {isActive && (
                     <>
-                      <div className="glass-card-desc" style={{ fontSize: '14px', marginTop: '4px' }}>
-                        {cert.description}
-                      </div>
+                      <p className="glass-card-desc cert-desc">{cert.description}</p>
 
-                      <div className="flex gap-2 w-full mt-auto pt-4 border-t border-[#A47A2D]/10">
-                        {cert.sourceFile && (
-                          <a
-                            href={cert.sourceFile}
-                            download
-                            className="glass-card-link"
-                            style={{ width: '44px', padding: '0', justifyContent: 'center' }}
-                            title="Download Certificate"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Download className="w-5 h-5" />
-                          </a>
-                        )}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedCert(cert);
-                          }}
-                          className="glass-card-link grow"
-                          style={{
-                            justifyContent: 'center',
-                            background: '#A47A2D',
-                            color: 'white',
-                            border: 'none',
-                            padding: '0 16px',
-                            height: '44px',
-                            cursor: 'pointer'
-                          }}
+                      <div className="cert-actions">
+                        <a
+                          href={cert.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          className="cert-btn cert-btn-primary"
+                          title={`Verify ${cert.title} on ${cert.issuer}`}
                         >
-                          <Eye className="w-4 h-4" />
-                          <span className="text-[11px] font-black uppercase tracking-widest" style={{ fontFamily: 'Michroma, sans-serif' }}>Preview Image</span>
-                        </button>
+                          <ExternalLink className="w-4 h-4" />
+                          <span>View Credential</span>
+                        </a>
+                        <div className="cert-actions-row">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedCert(cert);
+                            }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            className="cert-btn cert-btn-ghost"
+                          >
+                            <Eye className="w-4 h-4" />
+                            <span>Preview</span>
+                          </button>
+                          {cert.sourceFile && (
+                            <a
+                              href={cert.sourceFile}
+                              download
+                              onClick={(e) => e.stopPropagation()}
+                              onPointerDown={(e) => e.stopPropagation()}
+                              className="cert-btn cert-btn-ghost"
+                              title="Download Certificate"
+                            >
+                              <Download className="w-4 h-4" />
+                              <span>Download</span>
+                            </a>
+                          )}
+                        </div>
                       </div>
                     </>
                   )}

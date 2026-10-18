@@ -9,6 +9,8 @@ import phpBasicsPdf from '../assets/phpBasics.pdf';
 import comptiaSource from '../assets/comptiaReal.webp';
 import ccnaPdf from '../assets/ccna.pdf';
 import awsPdf from '../assets/aws.pdf';
+import htmlImg from '../assets/htmlFundamentals.webp';
+import jsImg from '../assets/jsFundamentals.webp';
 import profileImg from '../assets/casualProf.webp';
 import CertCoverflow from '../components/CertCoverflow';
 
@@ -25,6 +27,24 @@ export default function AboutPage() {
   const softSkills = ['Adaptability', 'Problem Solving', 'Team Collaboration', 'Fast Learning', 'Communication', 'Critical Thinking'];
 
   const certifications = [
+    {
+      title: 'JavaScript Fundamentals',
+      issuer: 'FREEACADEMY.AI',
+      image: jsImg,
+      link: 'https://freeacademy.ai/verify/FA-2026-JF-CULV6N',
+      sourceFile: jsImg,
+      description: 'Covers core JavaScript concepts across 37 lessons, verified by a passed final exam.',
+      alt: 'JavaScript Fundamentals certificate of completion issued to Josh Aguiluz by FreeAcademy.ai'
+    },
+    {
+      title: 'HTML Fundamentals',
+      issuer: 'FREEACADEMY.AI',
+      image: htmlImg,
+      link: 'https://freeacademy.ai/verify/FA-2026-HF-DIZS8J',
+      sourceFile: htmlImg,
+      description: 'Covers semantic HTML and page structure across 32 lessons, verified by a passed final exam.',
+      alt: 'HTML Fundamentals certificate of completion issued to Josh Aguiluz by FreeAcademy.ai'
+    },
     {
       title: 'PHP Basics',
       issuer: 'SIMPLILEARN',
