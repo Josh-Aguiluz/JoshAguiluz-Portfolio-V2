@@ -100,7 +100,7 @@ export default function HomePage() {
             >
               <div className="absolute left-3 sm:left-4 h-2 w-2 rounded-full bg-green-400 animate-pulse shadow-[0_0_6px_rgba(74,222,128,0.6)]" />
               <p className="font-mono text-[10px] sm:text-xs md:text-sm font-bold text-white uppercase tracking-widest whitespace-nowrap">
-                Available for Work
+                Available for Work HEHEHE
               </p>
             </motion.div>
 
