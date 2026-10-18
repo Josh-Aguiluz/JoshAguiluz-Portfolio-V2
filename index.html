@@ -9,16 +9,15 @@
     content="Portfolio of Josh Andrei Aguiluz, a Top 1% Information Technology student specializing in Backend-focused Full-Stack Engineering." />
 
   <meta name="color-scheme" content="dark light" />
-  <meta name="theme-color" content="#09090b" media="(prefers-color-scheme: dark)" />
-  <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
-
-  <!-- Theme before first paint: saved choice, else the OS preference, else dark. -->
+  <meta name="theme-color" content="#09090b" />
+  
+  <!-- Theme before first paint: saved choice, else dark (the default, whatever the OS prefers). -->
   <script>
     (function () {
       var theme;
       try { theme = localStorage.getItem('theme'); } catch (e) {}
       if (theme !== 'light' && theme !== 'dark') {
-        theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        theme = 'dark';
       }
       var root = document.documentElement;
       root.classList.toggle('dark', theme === 'dark');
