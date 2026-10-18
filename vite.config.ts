@@ -1,85 +1,135 @@
+import { defineConfig, loadEnv, type Plugin } from 'vite';
+import react from '@vitejs/plugin-react-swc';
+import tailwindcss from '@tailwindcss/vite';
+import { imagetools } from 'vite-imagetools';
+import path from 'path';
 
-  import { defineConfig } from 'vite';
-  import react from '@vitejs/plugin-react-swc';
-  import path from 'path';
+/**
+ * Absolute URLs (canonical, og:url, og:image, sitemap) need the deployed origin.
+ * It is never hard-coded: set SITE_URL yourself, or let Netlify provide URL at build time.
+ * Without one, the absolute-URL tags and the sitemap are simply left out.
+ */
+const SITE_URL = (process.env.SITE_URL || process.env.URL || '').replace(/\/$/, '');
 
-  export default defineConfig({
-    plugins: [react()],
-    resolve: {
-      extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
-      alias: {
-        'vaul@1.1.2': 'vaul',
-        'sonner@2.0.3': 'sonner',
-        'recharts@2.15.2': 'recharts',
-        'react-resizable-panels@2.1.7': 'react-resizable-panels',
-        'react-hook-form@7.55.0': 'react-hook-form',
-        'react-day-picker@8.10.1': 'react-day-picker',
-        'next-themes@0.4.6': 'next-themes',
-        'lucide-react@0.487.0': 'lucide-react',
-        'input-otp@1.4.2': 'input-otp',
-        'figma:asset/f8e0d4fdfa99f0810ed0358a13ee96e447e08bcc.png': path.resolve(__dirname, './src/assets/f8e0d4fdfa99f0810ed0358a13ee96e447e08bcc.png'),
-        'figma:asset/916057e4d784a6f22523da6d03e95bf8726dd99b.png': path.resolve(__dirname, './src/assets/916057e4d784a6f22523da6d03e95bf8726dd99b.png'),
-        'figma:asset/56e417b118a23871f1b870fa873fff84b6f0d52b.png': path.resolve(__dirname, './src/assets/56e417b118a23871f1b870fa873fff84b6f0d52b.png'),
-        'embla-carousel-react@8.6.0': 'embla-carousel-react',
-        'cmdk@1.1.1': 'cmdk',
-        'class-variance-authority@0.7.1': 'class-variance-authority',
-        '@radix-ui/react-tooltip@1.1.8': '@radix-ui/react-tooltip',
-        '@radix-ui/react-toggle@1.1.2': '@radix-ui/react-toggle',
-        '@radix-ui/react-toggle-group@1.1.2': '@radix-ui/react-toggle-group',
-        '@radix-ui/react-tabs@1.1.3': '@radix-ui/react-tabs',
-        '@radix-ui/react-switch@1.1.3': '@radix-ui/react-switch',
-        '@radix-ui/react-slot@1.1.2': '@radix-ui/react-slot',
-        '@radix-ui/react-slider@1.2.3': '@radix-ui/react-slider',
-        '@radix-ui/react-separator@1.1.2': '@radix-ui/react-separator',
-        '@radix-ui/react-select@2.1.6': '@radix-ui/react-select',
-        '@radix-ui/react-scroll-area@1.2.3': '@radix-ui/react-scroll-area',
-        '@radix-ui/react-radio-group@1.2.3': '@radix-ui/react-radio-group',
-        '@radix-ui/react-progress@1.1.2': '@radix-ui/react-progress',
-        '@radix-ui/react-popover@1.1.6': '@radix-ui/react-popover',
-        '@radix-ui/react-navigation-menu@1.2.5': '@radix-ui/react-navigation-menu',
-        '@radix-ui/react-menubar@1.1.6': '@radix-ui/react-menubar',
-        '@radix-ui/react-label@2.1.2': '@radix-ui/react-label',
-        '@radix-ui/react-hover-card@1.1.6': '@radix-ui/react-hover-card',
-        '@radix-ui/react-dropdown-menu@2.1.6': '@radix-ui/react-dropdown-menu',
-        '@radix-ui/react-dialog@1.1.6': '@radix-ui/react-dialog',
-        '@radix-ui/react-context-menu@2.2.6': '@radix-ui/react-context-menu',
-        '@radix-ui/react-collapsible@1.1.3': '@radix-ui/react-collapsible',
-        '@radix-ui/react-checkbox@1.1.4': '@radix-ui/react-checkbox',
-        '@radix-ui/react-avatar@1.1.3': '@radix-ui/react-avatar',
-        '@radix-ui/react-aspect-ratio@1.1.2': '@radix-ui/react-aspect-ratio',
-        '@radix-ui/react-alert-dialog@1.1.6': '@radix-ui/react-alert-dialog',
-        '@radix-ui/react-accordion@1.2.3': '@radix-ui/react-accordion',
-        '@': path.resolve(__dirname, './src'),
+function siteMeta(): Plugin {
+  return {
+    name: 'site-meta',
+    transformIndexHtml: {
+      order: 'post',
+      handler(html, ctx) {
+        const tags: { tag: string; attrs: Record<string, string>; injectTo: 'head' }[] = [];
+
+        // Preload the self-hosted Latin Geist font used by the hero heading.
+        const font = ctx.bundle
+          ? Object.keys(ctx.bundle).find((f) => /geist-latin-wght-normal.*\.woff2$/.test(f))
+          : undefined;
+        if (font) {
+          tags.push({
+            tag: 'link',
+            attrs: { rel: 'preload', as: 'font', type: 'font/woff2', href: `/${font}`, crossorigin: '' },
+            injectTo: 'head',
+          });
+        }
+
+        if (SITE_URL) {
+          const meta = (attrs: Record<string, string>) => tags.push({ tag: 'meta', attrs, injectTo: 'head' });
+          tags.push({ tag: 'link', attrs: { rel: 'canonical', href: `${SITE_URL}/` }, injectTo: 'head' });
+          meta({ property: 'og:url', content: `${SITE_URL}/` });
+          meta({ property: 'og:image', content: `${SITE_URL}/og-image.png` });
+          meta({ property: 'og:image:width', content: '1200' });
+          meta({ property: 'og:image:height', content: '630' });
+          meta({ property: 'og:image:alt', content: 'Josh Andrei Aguiluz, Backend Engineer' });
+          meta({ name: 'twitter:image', content: `${SITE_URL}/og-image.png` });
+          html = html.replace('"@type": "Person",', `"@type": "Person",\n        "url": "${SITE_URL}/",`);
+        }
+        return { html, tags };
       },
     },
-    build: {
-      target: 'esnext',
-      outDir: 'build',
-      chunkSizeWarningLimit: 1000,
-      rollupOptions: {
-        output: {
-          manualChunks(id) {
-            if (id.includes('node_modules')) {
-              if (id.includes('three') || id.includes('@react-three')) {
-                return 'vendor-3d';
-              }
-              if (id.includes('framer-motion')) {
-                return 'vendor-motion';
-              }
-              if (id.includes('recharts')) {
-                return 'vendor-charts';
-              }
-              if (id.includes('lucide-react') || id.includes('@radix-ui')) {
-                return 'vendor-ui';
-              }
-              return 'vendor'; // all other dependencies
-            }
-          }
+    generateBundle() {
+      this.emitFile({
+        type: 'asset',
+        fileName: 'robots.txt',
+        source: `User-agent: *\nAllow: /\n${SITE_URL ? `\nSitemap: ${SITE_URL}/sitemap.xml\n` : ''}`,
+      });
+      if (!SITE_URL) return;
+      this.emitFile({
+        type: 'asset',
+        fileName: 'sitemap.xml',
+        source: `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>${SITE_URL}/</loc></url>\n</urlset>\n`,
+      });
+    },
+  };
+}
+
+/**
+ * Dev only: serves POST /api/chat from netlify/functions/chat.mjs so the AI chat works under
+ * `npm run dev` without the Netlify CLI. The key is read from GROQ_API_KEY in your (git-ignored)
+ * .env file. In production Netlify runs the same function itself.
+ */
+function devChatApi(): Plugin {
+  return {
+    name: 'dev-chat-api',
+    apply: 'serve',
+    configureServer(server) {
+      const env = loadEnv(server.config.mode, process.cwd(), '');
+      for (const key of ['GROQ_API_KEY', 'GROQ_MODEL']) if (env[key]) process.env[key] = env[key];
+
+      server.middlewares.use('/api/chat', async (req, res) => {
+        try {
+          const chunks: Buffer[] = [];
+          for await (const chunk of req) chunks.push(chunk as Buffer);
+          const body = Buffer.concat(chunks);
+
+          const headers = new Headers();
+          for (const [k, v] of Object.entries(req.headers)) if (v !== undefined) headers.set(k, Array.isArray(v) ? v.join(',') : v);
+          const request = new Request(`http://${req.headers.host}/api/chat`, {
+            method: req.method,
+            headers,
+            body: req.method === 'GET' || req.method === 'HEAD' ? undefined : body,
+          });
+
+          // Reload the function on every request so edits apply without restarting the dev server.
+          const mod = await server.ssrLoadModule('/netlify/functions/chat.mjs');
+          const response: Response = await mod.default(request, { ip: req.socket.remoteAddress });
+
+          res.statusCode = response.status;
+          response.headers.forEach((value, name) => res.setHeader(name, value));
+          res.end(Buffer.from(await response.arrayBuffer()));
+        } catch (error) {
+          server.config.logger.error(`[dev-chat-api] ${(error as Error).message}`);
+          res.statusCode = 500;
+          res.setHeader('content-type', 'application/json');
+          res.end(JSON.stringify({ error: 'dev_error' }));
         }
-      }
+      });
     },
-    server: {
-      port: 3000,
-      open: true,
+  };
+}
+
+export default defineConfig({
+  plugins: [react(), tailwindcss(), imagetools(), siteMeta(), devChatApi()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
     },
-  });
+  },
+  build: {
+    target: 'es2020',
+    outDir: 'build',
+    rollupOptions: {
+      output: {
+        // React + router are stable across deploys, so they get their own long-cached chunk.
+        // Framer Motion is left to Rollup so its async `domMax` features stay out of the entry.
+        manualChunks(id) {
+          if (/node_modules[\\/](react|react-dom|scheduler|react-router|react-router-dom)[\\/]/.test(id)) {
+            return 'vendor-react';
+          }
+        },
+      },
+    },
+  },
+  server: {
+    port: 3000,
+    open: true,
+  },
+});

@@ -1,33 +1,28 @@
 import React, { useState, useEffect } from 'react';
 
+const phases = [
+  '> Initializing System...',
+  '> Loading Backend Architecture...',
+  "> Josh_Aguiluz.exe Ready."
+];
+
 export default function TypewriterTerminal() {
   const [displayText, setDisplayText] = useState('');
   const [currentPhase, setCurrentPhase] = useState(0);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [showCursor, setShowCursor] = useState(true);
 
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  const phases = [
-    '> Initializing System...',
-    '> Loading Backend Architecture...',
-    "> Josh_Aguiluz.exe Ready."
-  ];
-
+  // Blinking cursor (JS-driven so it keeps blinking even with OS animations turned off)
   useEffect(() => {
-    // Blinking cursor effect
-    const cursorInterval = setInterval(() => {
-      setShowCursor(prev => !prev);
-    }, 500);
-
+    const cursorInterval = setInterval(() => setShowCursor((prev) => !prev), 500);
     return () => clearInterval(cursorInterval);
   }, []);
 
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: ReturnType<typeof setTimeout>;
     const currentText = phases[currentPhase];
 
     if (isDeleting) {
-      // Deleting text
       timer = setTimeout(() => {
         setDisplayText(currentText.substring(0, displayText.length - 1));
         if (displayText.length === 0) {
@@ -35,16 +30,11 @@ export default function TypewriterTerminal() {
           setCurrentPhase((prev) => (prev + 1) % phases.length);
         }
       }, 30); // Deleting speed
+    } else if (displayText.length === currentText.length) {
+      timer = setTimeout(() => setIsDeleting(true), 2000); // Pause before deleting
     } else {
-      // Typing text
       timer = setTimeout(() => {
         setDisplayText(currentText.substring(0, displayText.length + 1));
-        if (displayText.length === currentText.length) {
-          // Pause before deleting
-          timer = setTimeout(() => {
-            setIsDeleting(true);
-          }, 2000); // Wait 2s before deleting
-        }
       }, 50); // Typing speed
     }
 
@@ -52,11 +42,13 @@ export default function TypewriterTerminal() {
   }, [displayText, currentPhase, isDeleting]);
 
   return (
-    <div className="font-mono text-[18px] md:text-[20px] text-[#521D07] dark:text-[#A47A2D] mt-6">
-      <span>{displayText}</span>
-      <span className={`inline-block w-2 h-5 bg-[#521D07] dark:bg-[#A47A2D] ml-1 ${showCursor ? 'opacity-100' : 'opacity-0'} transition-opacity`}>
-        {showCursor ? '█' : ''}
-      </span>
-    </div>
+    <p className="flex h-6 items-center font-mono text-sm text-fg">
+      <span className="sr-only">{phases[phases.length - 1]}</span>
+      <span aria-hidden="true" className="truncate">{displayText}</span>
+      <span
+        aria-hidden="true"
+        className={`ml-0.5 inline-block h-4 w-2 shrink-0 bg-accent ${showCursor ? 'opacity-100' : 'opacity-0'}`}
+      />
+    </p>
   );
 }

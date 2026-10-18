@@ -1,323 +1,267 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { AnimatePresence, m } from 'framer-motion';
 import { Menu, X } from 'lucide-react';
-import { motion } from 'framer-motion';
-import logo from './assets/logo.webp';
+import logo from './assets/logo.webp?w=96&h=96&fit=cover&format=webp';
 import HomePage from './pages/HomePage';
+import ThemeToggle from './components/ThemeToggle';
+import ScrollProgress from './components/ScrollProgress';
+import Footer from './components/Footer';
+import { useDialogFocus } from './lib/useDialogFocus';
+import ChatLauncher from './components/chat/ChatLauncher';
+import { CHAT_ENABLED } from './config/layout';
+
+// Every section renders up front (and is pre-rendered into the HTML at build time), so the
+// page has its full height on the first frame and the scroll position can be restored before
+// anything is painted. Images inside the sections still load lazily.
 import AboutPage from './pages/AboutPage';
 import ProjectsPage from './pages/ProjectsPage';
 import ResumePage from './pages/ResumePage';
 import BlogPage from './pages/BlogPage';
 import ContactPage from './pages/ContactPage';
-import ThemeToggle from './components/ThemeToggle';
-import CustomCursor from './components/CustomCursor';
-import MagneticButton from './components/MagneticButton';
-import ScrollVelocityText from './components/ScrollVelocityText';
-import Scene3D from './components/Scene3D';
-import ScrollProgress from './components/ScrollProgress';
-import Footer from './components/Footer';
 
-// Memoize page sections to prevent re-renders on every scroll tick
-const MemoizedHomePage = React.memo(HomePage);
-const MemoizedAboutPage = React.memo(AboutPage);
-const MemoizedProjectsPage = React.memo(ProjectsPage);
-const MemoizedResumePage = React.memo(ResumePage);
-const MemoizedBlogPage = React.memo(BlogPage);
-const MemoizedContactPage = React.memo(ContactPage);
-const MemoizedFooter = React.memo(Footer);
+const NAV_LINKS = [
+  { name: 'Home', id: 'home' },
+  { name: 'About', id: 'about' },
+  { name: 'Projects', id: 'projects' },
+  { name: 'Resume', id: 'resume' },
+  { name: 'Blog', id: 'blog' },
+  { name: 'Contact', id: 'contact' },
+];
+
+const BASE_TITLE = 'Josh Andrei Aguiluz | Backend Engineer';
+
+const SECTIONS: { id: string; Page: () => React.JSX.Element }[] = [
+  { id: 'about', Page: AboutPage },
+  { id: 'projects', Page: ProjectsPage },
+  { id: 'resume', Page: ResumePage },
+  { id: 'blog', Page: BlogPage },
+  { id: 'contact', Page: ContactPage },
+];
+
+// useLayoutEffect warns during the build-time server render; it is a no-op there anyway.
+const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+
+const SCROLL_KEY = 'scroll-y';
+
+/**
+ * Reload / back-forward / duplicated tab: return to the saved pixel position.
+ * Fresh visit with a hash (shared link): go to that section. Otherwise: nothing.
+ */
+function getRestoreTarget(): { y?: number; id?: string } | null {
+  const nav = performance.getEntriesByType?.('navigation')[0] as PerformanceNavigationTiming | undefined;
+  if (nav && nav.type !== 'navigate') {
+    try {
+      const saved = sessionStorage.getItem(SCROLL_KEY);
+      if (saved !== null && !Number.isNaN(Number(saved))) return { y: Number(saved) };
+    } catch {
+      /* storage unavailable */
+    }
+  }
+  const id = window.location.hash.slice(1);
+  return id ? { id } : null;
+}
 
 export default function App() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('home');
-  const [scrollYValue, setScrollYValue] = useState(0);
-  const [scrollYProgressValue, setScrollYProgressValue] = useState(0);
+  // Becomes true once the initial scroll position has been restored.
+  const hashHandled = useRef(false);
 
+  const headerRef = useRef<HTMLElement>(null);
+  const firstMobileLinkRef = useRef<HTMLAnchorElement>(null);
+  const closeMenu = useCallback(() => setMobileMenuOpen(false), []);
+
+  // `scrolled` only re-renders when the boolean actually flips.
+  // The scroll position is saved per tab so a reload or duplicated tab reopens at the same spot.
   useEffect(() => {
-    // Smooth scroll setup
-    document.documentElement.style.scrollBehavior = 'smooth';
-
-    const handleScroll = () => {
-      const scrollY = window.scrollY;
-      setScrollYValue(scrollY);
-      setScrolled(scrollY > 50);
-
-      // Calculate scroll progress
-      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-      const progress = maxScroll > 0 ? scrollY / maxScroll : 0;
-      setScrollYProgressValue(progress);
-
-      // Detect active section based on scroll position
-      const sections = ['home', 'about', 'projects', 'resume', 'blog', 'contact'];
-      const scrollPosition = scrollY + window.innerHeight / 2;
-
-      for (const section of sections) {
-        const element = document.getElementById(section);
-        if (element) {
-          const { offsetTop, offsetHeight } = element;
-          if (scrollPosition >= offsetTop && scrollPosition < offsetTop + offsetHeight) {
-            setActiveSection(section);
-            break;
-          }
-        }
+    let saveTimer: ReturnType<typeof setTimeout> | undefined;
+    const save = () => {
+      if (!hashHandled.current) return; // don't overwrite the saved spot before it is restored
+      try {
+        sessionStorage.setItem(SCROLL_KEY, String(Math.round(window.scrollY)));
+      } catch {
+        /* storage unavailable */
       }
     };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
+    const onScroll = () => {
+      setScrolled(window.scrollY > 8);
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(save, 150);
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('pagehide', save);
     return () => {
-      window.removeEventListener('scroll', handleScroll);
-      document.documentElement.style.scrollBehavior = 'auto';
+      clearTimeout(saveTimer);
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('pagehide', save);
     };
   }, []);
 
-  // Sync activeSection to URL Hash (SEO Requirement: Meaningful URLs)
+  // Active section via IntersectionObserver: a thin band across the middle of the viewport.
   useEffect(() => {
-    if (activeSection === 'home') {
-      window.history.replaceState(null, '', window.location.pathname);
-    } else {
-      window.history.replaceState(null, '', `#${activeSection}`);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) setActiveSection(entry.target.id);
+        }
+      },
+      { rootMargin: '-45% 0px -54% 0px' },
+    );
+    NAV_LINKS.forEach(({ id }) => {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  // Restore where the visitor was (reload / duplicated tab / Chrome tab discard) or honor a
+  // deep link (e.g. /#contact). Runs before the first paint, so nothing visibly jumps.
+  useIsoLayoutEffect(() => {
+    const target = getRestoreTarget();
+    if (target?.y != null) {
+      window.scrollTo({ top: target.y, behavior: 'instant' });
+    } else if (target?.id) {
+      document.getElementById(target.id)?.scrollIntoView({ block: 'start', behavior: 'instant' });
     }
+    hashHandled.current = true;
+  }, []);
+
+  // Sync the active section to the URL hash and the document title.
+  useEffect(() => {
+    if (!hashHandled.current) return;
+    const url = activeSection === 'home' ? window.location.pathname : `#${activeSection}`;
+    window.history.replaceState(window.history.state, '', url);
+    const name = activeSection.charAt(0).toUpperCase() + activeSection.slice(1);
+    document.title = activeSection === 'home' ? BASE_TITLE : `${name} | ${BASE_TITLE}`;
   }, [activeSection]);
 
-  // Sync section to Browser Title (SEO Requirement)
+  // Mobile menu: focus trap + Escape, body scroll lock, close when resized to desktop.
+  useDialogFocus(mobileMenuOpen, headerRef, { initialFocusRef: firstMobileLinkRef, onEscape: closeMenu });
   useEffect(() => {
-    const formattedSection = activeSection.charAt(0).toUpperCase() + activeSection.slice(1);
-    const baseTitle = "Josh Andrei Aguiluz | Backend Engineer";
-    
-    if (activeSection === 'home') {
-      document.title = baseTitle;
-    } else {
-      document.title = `${formattedSection} | ${baseTitle}`;
-    }
-  }, [activeSection]);
-
-  const scrollToSection = (sectionId: string) => {
-    const element = document.getElementById(sectionId);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      setMobileMenuOpen(false);
-      // Update hash immediately on click
-      window.history.pushState(null, '', sectionId === 'home' ? window.location.pathname : `#${sectionId}`);
-    }
-  };
-
-  const navLinks = [
-    { name: 'Home', id: 'home' },
-    { name: 'About', id: 'about' },
-    { name: 'Projects', id: 'projects' },
-    { name: 'Resume', id: 'resume' },
-    { name: 'Blog', id: 'blog' },
-    { name: 'Contact', id: 'contact' },
-  ];
+    if (!mobileMenuOpen) return;
+    document.body.style.overflow = 'hidden';
+    const mq = window.matchMedia('(min-width: 768px)');
+    const onChange = () => mq.matches && closeMenu();
+    mq.addEventListener('change', onChange);
+    return () => {
+      document.body.style.overflow = '';
+      mq.removeEventListener('change', onChange);
+    };
+  }, [mobileMenuOpen, closeMenu]);
 
   return (
-    <div className="relative overflow-x-hidden w-full bg-[#FDF5E7] dark:bg-[#1A1715]">
-      {/* 3D Bouncing Sphere */}
-      <Scene3D />
-
-      {/* Fixed Navigation - ALWAYS ON TOP */}
-      <motion.nav
-        initial={{ y: 0 }}
-        animate={{ y: 0 }}
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled
-          ? 'bg-[#FDF5E7]/95 dark:bg-[#1A1715]/95 backdrop-blur-sm shadow-lg border-b-4 border-[#A47A2D] py-4'
-          : 'bg-[#FDF5E7]/80 dark:bg-[#1A1715]/80 backdrop-blur-sm border-b-4 border-[#A47A2D] py-4'
-          }`}
+    <>
+      <a
+        href="#main"
+        className="sr-only-focusable fixed left-4 top-3 z-[70] rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-fg"
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12">
-          <div className="flex items-center justify-between">
-            {/* Logo with Magnetic Effect */}
-            <MagneticButton
-              onClick={() => scrollToSection('home')}
-              className="flex items-center transition-transform hover:scale-105 bg-transparent border-none"
-            >
-              <img
-                src={logo}
-                alt="Josh Aguiluz Logo"
-                className="h-16 md:h-20 w-auto object-contain"
-              />
-            </MagneticButton>
+        Skip to content
+      </a>
 
-            {/* Desktop Navigation with Magnetic Buttons */}
-            <div className="hidden md:flex items-center gap-4 lg:gap-8">
-              {navLinks.map((link) => (
-                <MagneticButton
-                  key={link.id}
-                  onClick={() => scrollToSection(link.id)}
-                  style={{ fontFamily: 'Michroma, sans-serif' }}
-                  className={`nav-link-item px-4 lg:px-6 py-2 text-[16px] font-black uppercase transition-all rounded-full border-none ${activeSection === link.id
-                    ? 'bg-[#A47A2D] dark:bg-[#A47A2D] text-white dark:text-[#1A1715]'
-                    : 'bg-transparent text-[#521D07] dark:text-[#E2E8F0] hover:bg-[#A47A2D]/20 hover:text-[#FFA51F]'
-                    }`}
-                >
-                  {link.name}
-                </MagneticButton>
-              ))}
-            </div>
-
-            <style dangerouslySetInnerHTML={{ __html: `
-              /* STRICT TABLET FIX: 768px to 1024px ONLY */
-              @media (min-width: 768px) and (max-width: 1024px) {
-                .nav-link-item {
-                  padding-left: 10px !important;
-                  padding-right: 10px !important;
-                  font-size: 11px !important;
-                }
-                .md\\:flex.gap-4 {
-                  gap: 8px !important;
-                }
-              }
-            `}} />
-
-            {/* Mobile Menu Button */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-3 rounded-[16px] bg-[#A47A2D] dark:bg-[#A47A2D] text-white dark:text-[#1A1715] z-50"
-            >
-              {mobileMenuOpen ? <X className="w-8 h-8" /> : <Menu className="w-8 h-8" />}
-            </button>
-          </div>
-        </div>
-      </motion.nav>
-
-      {/* Theme Toggle */}
-      <ThemeToggle />
-
-      {/* STANDARD VERTICAL LAYOUT - SMOOTH SCROLLING */}
-
-      {/* 1. HERO SECTION */}
-      <section
-        id="home"
-        className="relative w-full min-h-screen py-20 bg-transparent"
-      >
-        <MemoizedHomePage />
-      </section>
-
-      {/* 2. ABOUT SECTION */}
-      <section
-        id="about"
-        className="relative w-full min-h-screen py-20 bg-transparent"
-      >
-        <MemoizedAboutPage />
-      </section>
-
-      {/* SCROLL VELOCITY PARALLAX STRIP */}
-      <ScrollVelocityText text="BACKEND • FRONTEND • SCALABLE • SECURE" baseVelocity={1} />
-
-      {/* 3. PROJECTS SECTION */}
-      <section
-        id="projects"
-        className="relative w-full min-h-screen py-20 bg-transparent"
-      >
-        <MemoizedProjectsPage />
-      </section>
-
-      {/* 4. RESUME SECTION */}
-      <section
-        id="resume"
-        className="relative w-full min-h-screen bg-transparent"
-      >
-        <MemoizedResumePage />
-      </section>
-
-      {/* 5. BLOG SECTION */}
-      <section
-        id="blog"
-        className="relative w-full min-h-screen py-20 bg-transparent"
-      >
-        <MemoizedBlogPage />
-      </section>
-
-      {/* 6. CONTACT SECTION */}
-      <section
-        id="contact"
-        className="relative w-full min-h-screen py-20 bg-transparent"
-      >
-        <MemoizedContactPage />
-      </section>
-
-      <MemoizedFooter />
-
-      {/* Redesigned Premium Mobile Menu Overlay - Moved to bottom for max visibility */}
-      <motion.div
-        initial="closed"
-        animate={mobileMenuOpen ? "open" : "closed"}
-        variants={{
-          open: {
-            x: 0,
-            opacity: 1,
-            transition: {
-              type: "spring",
-              stiffness: 100,
-              damping: 20
-            }
-          },
-          closed: {
-            x: "100%",
-            opacity: 0,
-            transition: {
-              type: "spring",
-              stiffness: 100,
-              damping: 20,
-              delay: 0.1
-            }
-          }
-        }}
-        className="fixed inset-0 z-[9999] md:hidden bg-[#FDF5E7] dark:bg-[#1A1715] flex flex-col items-center"
-      >
-        {/* Mobile Menu Close Button - High visibility */}
-        <div className="w-full flex justify-end p-8">
-          <button
-            onClick={() => setMobileMenuOpen(false)}
-            className="p-4 rounded-full bg-[#A47A2D] text-white dark:text-[#1A1715] shadow-2xl"
-          >
-            <X className="w-8 h-8" />
-          </button>
-        </div>
-
-        {/* Menu Links Area */}
-        <div className="flex-1 w-full flex flex-col justify-center items-center px-6">
-          <div className="space-y-4 w-full max-w-[320px]">
-            {navLinks.map((link, index) => (
-              <motion.button
-                key={link.id}
-                variants={{
-                  open: { 
-                    x: 0, 
-                    opacity: 1, 
-                    transition: { delay: 0.4 + index * 0.1 } 
-                  },
-                  closed: { x: 50, opacity: 0 }
-                }}
-                onClick={() => scrollToSection(link.id)}
-                className={`group relative w-full py-4 px-2 rounded-2xl transition-all ${activeSection === link.id
-                  ? 'text-[#A47A2D]'
-                  : 'text-[#521D07] dark:text-white'
-                  }`}
-              >
-                <div 
-                  className="relative z-10 text-[28px] sm:text-[36px] font-black uppercase tracking-tighter text-center"
-                  style={{ fontFamily: 'Michroma, sans-serif' }}
-                >
-                  {link.name}
-                  {activeSection === link.id && (
-                    <motion.div 
-                      layoutId="mobileNavUnderline"
-                      className="h-1 bg-[#A47A2D] mt-2 mx-auto w-16 rounded-full" 
-                    />
-                  )}
-                </div>
-              </motion.button>
-            ))}
-          </div>
-        </div>
-
-      </motion.div>
-
-      {/* Global Scroll Progress Bar */}
       <ScrollProgress />
 
-      {/* Custom Cursor - Rendered last so it sits on top of everything including modals */}
-      <CustomCursor />
-    </div>
+      <header
+        ref={headerRef}
+        className={`fixed inset-x-0 top-0 z-50 border-b transition-colors duration-200 ${
+          scrolled || mobileMenuOpen ? 'border-border bg-bg/95' : 'border-transparent bg-transparent'
+        }`}
+      >
+        <nav aria-label="Primary" className="container-page flex h-16 items-center justify-between gap-4">
+          <a href="#home" className="flex items-center gap-2.5 rounded-md" onClick={closeMenu}>
+            <img src={logo} alt="" width={32} height={32} className="h-8 w-8 rounded-full" />
+            <span className="text-[0.9375rem] font-semibold tracking-tight">Josh Aguiluz</span>
+          </a>
+
+          <ul className="hidden items-center gap-1 md:flex">
+            {NAV_LINKS.map((link) => {
+              const active = activeSection === link.id;
+              return (
+                <li key={link.id}>
+                  <a
+                    href={`#${link.id}`}
+                    aria-current={active ? 'location' : undefined}
+                    className={`relative inline-flex h-9 items-center rounded-md px-3 text-sm transition-colors ${
+                      active ? 'text-fg' : 'text-fg-muted hover:text-fg'
+                    }`}
+                  >
+                    {link.name}
+                    <span
+                      aria-hidden="true"
+                      className={`absolute inset-x-3 -bottom-[13px] h-px bg-accent transition-opacity ${active ? 'opacity-100' : 'opacity-0'}`}
+                    />
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen((o) => !o)}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="mobile-menu"
+              aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+              className="icon-btn md:hidden"
+            >
+              {mobileMenuOpen ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
+            </button>
+          </div>
+        </nav>
+
+        {/* Mobile menu */}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <m.div
+              id="mobile-menu"
+              className="fixed inset-x-0 bottom-0 top-16 overflow-y-auto border-t border-border bg-bg md:hidden"
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.18 }}
+            >
+              <ul className="container-page flex flex-col py-6">
+                {NAV_LINKS.map((link, i) => {
+                  const active = activeSection === link.id;
+                  return (
+                    <li key={link.id} className="border-b border-border">
+                      <a
+                        ref={i === 0 ? firstMobileLinkRef : undefined}
+                        href={`#${link.id}`}
+                        onClick={closeMenu}
+                        aria-current={active ? 'location' : undefined}
+                        className={`flex items-center justify-between py-4 text-2xl font-semibold tracking-tight ${active ? 'text-fg' : 'text-fg-muted'}`}
+                      >
+                        {link.name}
+                        {active && <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-hidden="true" />}
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
+            </m.div>
+          )}
+        </AnimatePresence>
+      </header>
+
+      <main id="main" tabIndex={-1} className="outline-none">
+        <section id="home" aria-label="Introduction">
+          <HomePage />
+        </section>
+
+        {SECTIONS.map(({ id, Page }) => (
+          <section key={id} id={id} aria-labelledby={`${id}-title`} className="border-t border-border">
+            <Page />
+          </section>
+        ))}
+      </main>
+
+      <Footer showBackToTop={scrolled} />
+
+      {CHAT_ENABLED && <ChatLauncher />}
+    </>
   );
 }

@@ -1,51 +1,33 @@
-import React, { useRef, useState } from 'react';
-import { motion, useMotionTemplate, useMotionValue } from 'framer-motion';
+import React from 'react';
 
-interface SpotlightCardProps {
-  children: React.ReactNode;
+type SpotlightCardProps<T extends React.ElementType> = {
+  as?: T;
   className?: string;
-}
+  children: React.ReactNode;
+} & Omit<React.ComponentPropsWithoutRef<T>, 'as' | 'className' | 'children'>;
 
-export default function SpotlightCard({ children, className = '' }: SpotlightCardProps) {
-  const cardRef = useRef<HTMLDivElement>(null);
-  const mouseX = useMotionValue(0);
-  const mouseY = useMotionValue(0);
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!cardRef.current) return;
-    const rect = cardRef.current.getBoundingClientRect();
-    mouseX.set(e.clientX - rect.left);
-    mouseY.set(e.clientY - rect.top);
+/**
+ * Card with a cursor-following glow. The pointer position is written to the
+ * --x / --y custom properties directly, so hovering never re-renders React.
+ * The glow itself is the `.spotlight::before` rule in styles/index.css.
+ */
+export default function SpotlightCard<T extends React.ElementType = 'div'>({
+  as,
+  className = '',
+  children,
+  ...rest
+}: SpotlightCardProps<T>) {
+  const Comp = (as ?? 'div') as React.ElementType;
+  const onPointerMove = (e: React.PointerEvent<HTMLElement>) => {
+    if (e.pointerType !== 'mouse') return;
+    const el = e.currentTarget;
+    const r = el.getBoundingClientRect();
+    el.style.setProperty('--x', `${e.clientX - r.left}px`);
+    el.style.setProperty('--y', `${e.clientY - r.top}px`);
   };
-
-  const handleMouseLeave = () => {
-    mouseX.set(0);
-    mouseY.set(0);
-  };
-
-  const background = useMotionTemplate`
-    radial-gradient(
-      400px circle at ${mouseX}px ${mouseY}px,
-      rgba(164, 122, 45, 0.15),
-      transparent 80%
-    )
-  `;
-
   return (
-    <div
-      ref={cardRef}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      className={`relative group ${className}`}
-    >
-      {/* Spotlight effect */}
-      <motion.div
-        className="pointer-events-none absolute inset-0 rounded-[24px] opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-        style={{ background }}
-      />
-      
-      {/* Content */}
-      <div className="relative z-10">{children}</div>
-    </div>
+    <Comp className={`spotlight surface ${className}`} onPointerMove={onPointerMove} {...rest}>
+      {children}
+    </Comp>
   );
 }
